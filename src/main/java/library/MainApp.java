@@ -326,13 +326,34 @@ public class MainApp extends Application {
 
     private TextField field(String p) {
         TextField tf=new TextField(); tf.setPromptText(p);
-        tf.setStyle("-fx-background-color:"+BG_CARD+";-fx-text-fill:white;-fx-prompt-text-fill:#555;-fx-border-color:#333;-fx-border-radius:8;-fx-background-radius:8;-fx-padding:8 12;-fx-font-size:13px;");
+        tf.setStyle(
+            "-fx-background-color: #1e1e1e;" +
+            "-fx-text-fill: white;" +
+            "-fx-prompt-text-fill: #777;" +
+            "-fx-border-color: #444;" +
+            "-fx-border-radius: 8;" +
+            "-fx-background-radius: 8;" +
+            "-fx-padding: 8 12;" +
+            "-fx-font-size: 13px;"
+        );
         return tf;
     }
     private TextArea styledTA() {
         TextArea ta=new TextArea();
-        ta.setStyle("-fx-background-color:"+BG_CARD+";-fx-text-fill:white;-fx-control-inner-background:"+BG_CARD+";-fx-border-color:#333;-fx-border-radius:8;-fx-background-radius:8;-fx-font-size:13px;");
-        ta.setWrapText(true); return ta;
+        ta.setStyle(
+            "-fx-control-inner-background: #1e1e1e;" +
+            "-fx-background-color: #1e1e1e;" +
+            "-fx-text-fill: white;" +
+            "-fx-highlight-fill: #d4fc3a;" +
+            "-fx-highlight-text-fill: black;" +
+            "-fx-border-color: #444;" +
+            "-fx-border-radius: 8;" +
+            "-fx-background-radius: 8;" +
+            "-fx-font-size: 13px;" +
+            "-fx-font-family: monospace;"
+        );
+        ta.setWrapText(true);
+        return ta;
     }
     private Button accentBtn(String t) {
         Button b=new Button(t);
@@ -350,7 +371,24 @@ public class MainApp extends Application {
         cb.setStyle("-fx-background-color:"+BG_CARD+";-fx-text-fill:white;-fx-border-color:#333;-fx-border-radius:8;-fx-background-radius:8;"); }
     private ListView<String> styledList() {
         ListView<String> lv=new ListView<>();
-        lv.setStyle("-fx-background-color:"+BG_CARD+";-fx-border-color:#333;-fx-border-radius:8;-fx-background-radius:8;");
+        lv.setStyle(
+            "-fx-background-color: #1e1e1e;" +
+            "-fx-border-color: #444;" +
+            "-fx-border-radius: 8;" +
+            "-fx-background-radius: 8;" +
+            "-fx-text-fill: white;" +
+            "-fx-font-size: 13px;"
+        );
+        lv.setCellFactory(list -> {
+            javafx.scene.control.ListCell<String> cell = new javafx.scene.control.ListCell<>() {
+                @Override protected void updateItem(String item, boolean empty) {
+                    super.updateItem(item, empty);
+                    if (empty || item == null) { setText(null); setStyle("-fx-background-color: #1e1e1e;"); }
+                    else { setText(item); setStyle("-fx-background-color: #1e1e1e; -fx-text-fill: white; -fx-font-size: 13px; -fx-padding: 6 10;"); }
+                }
+            };
+            return cell;
+        });
         return lv;
     }
     private <T> TableColumn<T,String> col(String name, java.util.function.Function<TableColumn.CellDataFeatures<T,String>,String> fn) {

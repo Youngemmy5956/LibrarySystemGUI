@@ -7,8 +7,8 @@ import java.util.stream.Collectors;
 
 public class AIRecommender {
 
-    private static final String API_URL = "https://api.anthropic.com/v1/messages";
-    private final HttpClient httpClient  = HttpClient.newHttpClient();
+    private static final String API_URL = "https://openrouter.ai/api/v1/chat/completions";
+    private final HttpClient httpClient = HttpClient.newHttpClient();
     private String apiKey;
 
     public AIRecommender(String apiKey) { this.apiKey = apiKey; }
@@ -16,7 +16,7 @@ public class AIRecommender {
     public boolean hasApiKey()          { return apiKey != null && !apiKey.isBlank(); }
 
     public String getRecommendations(Member member, List<LibraryItem> catalog) {
-        if (!hasApiKey()) return "Please set your Claude API key in Settings.";
+        if (!hasApiKey()) return "Please set your API key in Settings.";
 
         String borrowed = member.getBorrowedItems().isEmpty()
             ? "No borrowing history yet."
@@ -29,65 +29,68 @@ public class AIRecommender {
             .map(i -> i.getTitle() + " [" + i.getItemType() + "]")
             .collect(Collectors.joining(", "));
 
-        String prompt = "You are a library assistant. Member name: " + member.getName()
-            + ". Their borrowing history: " + borrowed
+        String prompt = "You are a library assistant. Member: " + member.getName()
+            + ". Borrowing history: " + borrowed
             + ". Available items: " + available
-            + ". Recommend 2-3 items they might enjoy with a brief reason. Be friendly and concise.";
+            + ". Recommend 2 or 3 items they might enjoy. Be friendly and brief.";
 
         return callAPI(prompt);
     }
 
     public String askQuestion(String question, List<LibraryItem> catalog) {
-        if (!hasApiKey()) return "Please set your Claude API key in Settings.";
+        if (!hasApiKey()) return "Please set your API key in Settings.";
 
         String catalogList = catalog.stream()
             .map(i -> i.getTitle() + " [" + i.getItemType() + "]")
             .collect(Collectors.joining(", "));
 
         String prompt = "You are a helpful library assistant. "
-            + "The library catalog contains: " + catalogList + ". "
-            + "Answer this question concisely in 2-3 sentences: " + question;
+            + "Library catalog: " + catalogList + ". "
+            + "Answer briefly: " + question;
 
         return callAPI(prompt);
     }
 
     private String callAPI(String prompt) {
         try {
-            String escapedPrompt = prompt
-                .replace("\\", "\\\\")
-                .replace("\"", "\\\"")
-                .replace("\n", " ")
-                .replace("\r", " ")
-                .replace("\t", " ");
+            // Build JSON manually — fully escaped
+            StringBuilder sb = new StringBuilder();
+            sb.append("{");
+            sb.append("\"model\":\"google/gemma-3-4b-it:free\",");
+            sb.append("\"messages\":[");
+            sb.append("{");
+            sb.append("\"role\":\"user\",");
+            sb.append("\"content\":");
+            sb.append(jsonString(prompt));
+            sb.append("}");
+            sb.append("]");
+            sb.append("}");
 
-            String body = "{"
-                + "\"model\":\"claude-haiku-4-5-20251001\","
-                + "\"max_tokens\":512,"
-                + "\"messages\":["
-                +   "{"
-                +     "\"role\":\"user\","
-                +     "\"content\":\"" + escapedPrompt + "\""
-                +   "}"
-                + "]"
-                + "}";
+            String body = sb.toString();
+
+            System.out.println("DEBUG body: " + body); // remove after testing
 
             HttpRequest request = HttpRequest.newBuilder()
                 .uri(URI.create(API_URL))
-                .header("Content-Type",      "application/json")
-                .header("x-api-key",         apiKey)
-                .header("anthropic-version", "2023-06-01")
+                .header("Content-Type",  "application/json")
+                .header("Authorization", "Bearer " + apiKey.trim())
+                .header("HTTP-Referer",  "http://localhost")
+                .header("X-Title",       "LibrarySystem")
                 .POST(HttpRequest.BodyPublishers.ofString(body))
                 .build();
 
             HttpResponse<String> response = httpClient.send(
                 request, HttpResponse.BodyHandlers.ofString());
 
+            System.out.println("DEBUG status: " + response.statusCode());
+            System.out.println("DEBUG body:   " + response.body());
+
             if (response.statusCode() == 200) {
                 return extractText(response.body());
             } else if (response.statusCode() == 401) {
-                return "Invalid API key. Go to Settings and check your key.";
+                return "Invalid API key. Go to Settings and re-enter your key.";
             } else if (response.statusCode() == 400) {
-                return "Bad request (400). Details: " + response.body();
+                return "Request error: " + response.body();
             } else {
                 return "AI error (" + response.statusCode() + "): " + response.body();
             }
@@ -97,26 +100,56 @@ public class AIRecommender {
         }
     }
 
+    // Properly escape a Java string into a JSON string value including quotes
+    private String jsonString(String text) {
+        StringBuilder sb = new StringBuilder("\"");
+        for (char c : text.toCharArray()) {
+            switch (c) {
+                case '"'  -> sb.append("\\\"");
+                case '\\' -> sb.append("\\\\");
+                case '\n' -> sb.append("\\n");
+                case '\r' -> sb.append("\\r");
+                case '\t' -> sb.append("\\t");
+                default   -> {
+                    if (c < 0x20) {
+                        sb.append(String.format("\\u%04x", (int) c));
+                    } else {
+                        sb.append(c);
+                    }
+                }
+            }
+        }
+        sb.append("\"");
+        return sb.toString();
+    }
+
     private String extractText(String json) {
         try {
-            String marker = "\"text\":\"";
-            int start = json.indexOf(marker);
-            if (start == -1) return "No response text found.";
-            start += marker.length();
+            // OpenRouter returns: "message":{"role":"assistant","content":"..."}
+            String[] markers = {"\"content\":\"", "\"content\": \""};
+            int start = -1;
+            String foundMarker = "";
+            for (String marker : markers) {
+                int idx = json.indexOf(marker);
+                if (idx != -1) { start = idx + marker.length(); foundMarker = marker; break; }
+            }
+            if (start == -1) return "No response found in: " + json.substring(0, Math.min(200, json.length()));
 
             int end = start;
             while (end < json.length()) {
-                if (json.charAt(end) == '"' && json.charAt(end - 1) != '\\') break;
+                char c = json.charAt(end);
+                if (c == '"' && json.charAt(end - 1) != '\\') break;
                 end++;
             }
 
             return json.substring(start, end)
                 .replace("\\n", "\n")
                 .replace("\\\"", "\"")
-                .replace("\\\\", "\\");
+                .replace("\\\\", "\\")
+                .replace("\\t", "\t");
 
         } catch (Exception e) {
-            return "Could not parse response: " + e.getMessage();
+            return "Parse error: " + e.getMessage() + " | Raw: " + json.substring(0, Math.min(300, json.length()));
         }
     }
 }
