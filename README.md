@@ -7,6 +7,20 @@ book recommendations and answer questions about the library catalog.
 
 ---
 
+## 👨‍🎓 Project Team
+
+| Name | Matric Number |
+|------|--------------|
+| AMOO Azeezat Oluwakemi | 24110591412 |
+| Adebayo Johnson Olorunfemi | 23110591377 |
+| Alex Elisha Stephen | 23110591271 |
+| Majoyegbe Israel Afolabi | 23110591135 |
+| Emmanuel Chukwudi Anene | 23110591276 |
+| SHITTU Rukayat Iretomiwa | 23110591217 |
+| Adeleke Oriyomi Oluwapelumi | 23110651019 |
+
+---
+
 ## 📸 What the App Looks Like
 
 The app opens as a desktop window with a dark sidebar and 6 screens:
